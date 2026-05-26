@@ -3,6 +3,9 @@
 .antigravitycli/
 .opencode/
 
+# Local imported context/data from sibling CEIA projects
+local_context/
+
 # Airflow generated runtime files
 airflow/logs/
 airflow/config/
