@@ -1,0 +1,15 @@
+# Agent/local AI tooling
+.atl/
+.antigravitycli/
+.opencode/
+
+# Local environment
+.env
+.venv/
+__pycache__/
+*.py[cod]
+
+# OS/editor noise
+.DS_Store
+.vscode/
+.idea/
