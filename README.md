@@ -31,17 +31,17 @@ Ejemplo de salida esperada:
 
 ```json
 {
-  "fecha_predicha": "2026-05-27",
-  "modelo_local": {
-    "probabilidad_lluvia": 0.72,
-    "llueve_predicho": true
+  "predicted_date": "2026-05-27",
+  "local_model": {
+    "rain_probability": 0.72,
+    "will_rain": true
   },
   "smn": {
-    "estacion_referencia": "OBERA_AERO",
-    "precipitacion_mm_dia": 4.2,
-    "llueve_predicho": true
+    "reference_station": "OBERA_AERO",
+    "daily_precipitation_mm": 4.2,
+    "will_rain": true
   },
-  "guardia_recomendada": "reforzada"
+  "recommended_guard": "reforzada"
 }
 ```
 
@@ -127,7 +127,80 @@ Para Misiones se consideran inicialmente:
 | Airflow | Orquestación de entrenamiento, ingesta SMN y predicción diaria. |
 | MLflow | Tracking de experimentos, métricas y artefactos. |
 | MinIO | Almacenamiento tipo S3 para datasets, modelos y salidas. |
-| PostgreSQL | Backend de metadatos para servicios del stack. |
+| PostgreSQL | Base relacional para metadatos de Airflow, MLflow y futuras tablas de aplicación. |
+| Valkey | Broker de Celery para workers de Airflow. |
+
+Airflow y MLflow usan PostgreSQL como backend de metadatos. MLflow guarda artefactos en MinIO usando buckets S3-compatible. Así evitamos el atajo de SQLite desde el principio y dejamos una arquitectura más parecida al TP de referencia.
+
+Buckets creados al levantar el stack:
+
+| Bucket | Uso |
+|---|---|
+| `mlflow` | Artefactos de experimentos y modelos registrados. |
+| `data` | Datasets, predicciones batch y salidas intermedias del pipeline. |
+
+Los nombres se pueden cambiar desde `.env` con `MLFLOW_BUCKET_NAME` y `DATA_REPO_BUCKET_NAME`.
+
+## Ejecución local
+
+Copiar variables de entorno de ejemplo:
+
+```bash
+cp .env.example .env
+```
+
+Levantar el stack base:
+
+```bash
+docker compose up --build
+```
+
+Servicios disponibles:
+
+| Servicio | URL |
+|---|---|
+| Frontend | http://localhost:5173 |
+| FastAPI | http://localhost:8000 |
+| Swagger | http://localhost:8000/docs |
+| Airflow | http://localhost:8080 |
+| MLflow | http://localhost:5000 |
+| MinIO | http://localhost:9001 |
+
+Si algún puerto te choca con servicios locales, cambiá los valores en `.env` antes de levantar el stack. Los principales son:
+
+```text
+API_PORT=8000
+FRONTEND_PORT=5173
+POSTGRES_PORT=5432
+MINIO_API_PORT=9000
+MINIO_CONSOLE_PORT=9001
+MLFLOW_PORT=5000
+AIRFLOW_PORT=8080
+```
+
+Para generar secretos locales seguros:
+
+```bash
+openssl rand -hex 32      # JWT_SECRET_KEY
+openssl rand -base64 32   # AIRFLOW_API_JWT_SECRET
+```
+
+Credenciales demo de la API:
+
+```text
+usuario: operador
+password: rainops-dev
+```
+
+Credenciales demo de Airflow:
+
+```text
+usuario: airflow
+password: airflow
+```
+
+> Estas credenciales son solo para desarrollo. Más adelante se reemplazan por usuarios persistidos en base de datos.
+> También son configurables desde `.env`; no uses estos valores fuera del entorno local del TP.
 
 ## Flujo operativo esperado
 

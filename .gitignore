@@ -3,6 +3,10 @@
 .antigravitycli/
 .opencode/
 
+# Airflow generated runtime files
+airflow/logs/
+airflow/config/
+
 # Local environment
 .env
 .venv/

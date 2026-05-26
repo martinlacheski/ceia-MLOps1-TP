@@ -1,0 +1,5 @@
+*** Update File: /home/martin/Code/CEIA/ceia-MLOps1-TP/.gitignore
+
+# Airflow generated runtime files
+airflow/logs/
+airflow/config/
