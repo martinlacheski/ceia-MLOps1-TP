@@ -67,7 +67,7 @@ def test_aggregate_daily_precipitation_groups_by_station_and_date():
     assert daily[0].station == "OBERA_AERO"
     assert daily[0].forecast_date == date(2026, 5, 26)
     assert daily[0].precipitation_mm == 3.5
-    assert daily[0].hours == 2
+    assert daily[0].forecast_steps == 2
     assert daily[1].station == "OBERA_AERO"
     assert daily[1].forecast_date == date(2026, 5, 27)
     assert daily[2].station == "POSADAS_AERO"
@@ -89,4 +89,5 @@ def test_daily_precipitation_to_jsonl_serializes_records():
 
     assert '"station": "OBERA_AERO"' in payload
     assert '"forecast_date": "2026-05-26"' in payload
+    assert '"forecast_steps": 2' in payload
     assert payload.endswith("\n")

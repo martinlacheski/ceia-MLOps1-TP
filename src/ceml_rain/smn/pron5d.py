@@ -1,9 +1,10 @@
-"""Utilities to parse SMN 5-day numeric forecast files.
+"""Utilidades para parsear pronósticos numéricos de 5 días del SMN.
 
-The SMN ``pron5d`` product is published as a ZIP with a TXT file inside.
-Each station section contains 3-hourly rows with temperature, wind and
-precipitation. This module keeps the parser dependency-free so it can run from
-Airflow tasks, notebooks or simple scripts without requiring pandas.
+El producto ``pron5d`` del SMN se publica como un ZIP con un TXT interno.
+Cada sección de estación contiene filas cada 3 horas con temperatura, viento y
+precipitación. Este módulo mantiene el parser sin dependencias externas para
+que pueda ejecutarse desde tareas de Airflow, notebooks o scripts simples sin
+requerir pandas.
 """
 
 from __future__ import annotations
@@ -57,7 +58,7 @@ _FORECAST_ROW_RE = re.compile(
 
 @dataclass(frozen=True)
 class HourlyForecast:
-    """One 3-hourly forecast row for a station."""
+    """Una fila de pronóstico cada 3 horas para una estación."""
 
     station: str
     forecast_at: datetime
@@ -67,7 +68,7 @@ class HourlyForecast:
     precipitation_mm: float
 
     def to_dict(self) -> dict[str, object]:
-        """Return a JSON-serializable representation."""
+        """Devuelve una representación serializable como JSON."""
 
         return {
             "station": self.station,
@@ -81,26 +82,26 @@ class HourlyForecast:
 
 @dataclass(frozen=True)
 class DailyPrecipitation:
-    """Daily precipitation aggregate for a station."""
+    """Agregado diario de precipitación para una estación."""
 
     station: str
     forecast_date: date
     precipitation_mm: float
-    hours: int
+    forecast_steps: int
 
     def to_dict(self) -> dict[str, object]:
-        """Return a JSON-serializable representation."""
+        """Devuelve una representación serializable como JSON."""
 
         return {
             "station": self.station,
             "forecast_date": self.forecast_date.isoformat(),
             "precipitation_mm": self.precipitation_mm,
-            "hours": self.hours,
+            "forecast_steps": self.forecast_steps,
         }
 
 
 def fetch_pron5d_text(url: str = PRON5D_URL, timeout: int = 30) -> str:
-    """Download the latest SMN pron5d ZIP and return the TXT content."""
+    """Descarga el ZIP pron5d más reciente del SMN y devuelve el TXT."""
 
     with urlopen(url, timeout=timeout) as response:
         payload = response.read()
@@ -108,17 +109,18 @@ def fetch_pron5d_text(url: str = PRON5D_URL, timeout: int = 30) -> str:
     with ZipFile(BytesIO(payload)) as zip_file:
         txt_names = [name for name in zip_file.namelist() if name.lower().endswith(".txt")]
         if not txt_names:
-            raise ValueError("SMN pron5d ZIP does not contain a TXT file")
+            raise ValueError("El ZIP pron5d del SMN no contiene un archivo TXT")
 
         return zip_file.read(txt_names[0]).decode("utf-8-sig")
 
 
 def parse_pron5d_text(text: str, stations: Iterable[str] | None = None) -> list[HourlyForecast]:
-    """Parse an SMN pron5d TXT into hourly forecast records.
+    """Parsea un TXT pron5d del SMN en registros horarios de pronóstico.
 
-    Args:
-        text: Raw TXT content extracted from the SMN ZIP.
-        stations: Optional station allowlist. When omitted, all stations are parsed.
+    Parámetros:
+        text: Contenido TXT crudo extraído del ZIP del SMN.
+        stations: Lista opcional de estaciones permitidas. Si se omite, se
+            parsean todas las estaciones.
     """
 
     station_filter = {station.upper() for station in stations} if stations else None
@@ -149,17 +151,17 @@ def parse_pron5d_text(text: str, stations: Iterable[str] | None = None) -> list[
 
 
 def parse_misiones_pron5d_text(text: str) -> list[HourlyForecast]:
-    """Parse only the Misiones stations used by this project."""
+    """Parsea solo las estaciones de Misiones usadas por este proyecto."""
 
     return parse_pron5d_text(text, stations=MISIONES_STATIONS)
 
 
 def build_daily_misiones_forecast(text: str | None = None) -> list[DailyPrecipitation]:
-    """Build the daily Misiones precipitation forecast from SMN pron5d.
+    """Construye el pronóstico diario de precipitación para Misiones.
 
-    When ``text`` is provided the function is deterministic and does not touch
-    the network, which is useful for tests. When omitted, it downloads the
-    latest SMN pron5d ZIP.
+    Si se pasa ``text``, la función es determinística y no toca la red, lo que
+    resulta útil para tests. Si se omite, descarga el ZIP pron5d más reciente
+    del SMN.
     """
 
     source_text = text if text is not None else fetch_pron5d_text()
@@ -168,31 +170,32 @@ def build_daily_misiones_forecast(text: str | None = None) -> list[DailyPrecipit
 
 
 def aggregate_daily_precipitation(records: Iterable[HourlyForecast]) -> list[DailyPrecipitation]:
-    """Aggregate 3-hourly precipitation rows by station and forecast date."""
+    """Agrega filas de precipitación cada 3 horas por estación y fecha."""
 
     totals: dict[tuple[str, date], tuple[float, int]] = {}
 
     for record in records:
         key = (record.station, record.forecast_at.date())
-        previous_total, previous_hours = totals.get(key, (0.0, 0))
-        totals[key] = (previous_total + record.precipitation_mm, previous_hours + 1)
+        previous_total, previous_steps = totals.get(key, (0.0, 0))
+        totals[key] = (previous_total + record.precipitation_mm, previous_steps + 1)
 
     return [
         DailyPrecipitation(
             station=station,
             forecast_date=forecast_date,
             precipitation_mm=round(total, 3),
-            hours=hours,
+            forecast_steps=steps,
         )
-        for (station, forecast_date), (total, hours) in sorted(totals.items())
+        for (station, forecast_date), (total, steps) in sorted(totals.items())
     ]
 
 
 def daily_precipitation_to_jsonl(records: Iterable[DailyPrecipitation]) -> str:
-    """Serialize daily precipitation records as JSON Lines.
+    """Serializa registros diarios de precipitación como JSONL.
 
-    JSONL is convenient for Airflow tasks and MinIO because it is appendable,
-    line-oriented and easy to inspect without extra dependencies.
+    JSONL es conveniente para tareas de Airflow y MinIO porque permite escritura
+    por líneas, se puede anexar fácilmente y es simple de inspeccionar sin
+    dependencias adicionales.
     """
 
     return "\n".join(json.dumps(record.to_dict(), sort_keys=True) for record in records) + "\n"
