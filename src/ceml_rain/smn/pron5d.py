@@ -9,11 +9,14 @@ requerir pandas.
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from datetime import date, datetime
 from io import BytesIO
 import json
+from pathlib import Path
 import re
+import sys
 from typing import Iterable
 from urllib.request import urlopen
 from zipfile import ZipFile
@@ -156,15 +159,20 @@ def parse_misiones_pron5d_text(text: str) -> list[HourlyForecast]:
     return parse_pron5d_text(text, stations=MISIONES_STATIONS)
 
 
-def build_daily_misiones_forecast(text: str | None = None) -> list[DailyPrecipitation]:
+def build_daily_misiones_forecast(
+    text: str | None = None,
+    *,
+    url: str = PRON5D_URL,
+    timeout: int = 30,
+) -> list[DailyPrecipitation]:
     """Construye el pronóstico diario de precipitación para Misiones.
 
     Si se pasa ``text``, la función es determinística y no toca la red, lo que
     resulta útil para tests. Si se omite, descarga el ZIP pron5d más reciente
-    del SMN.
+    del SMN usando ``url`` y ``timeout``.
     """
 
-    source_text = text if text is not None else fetch_pron5d_text()
+    source_text = text if text is not None else fetch_pron5d_text(url=url, timeout=timeout)
     records = parse_misiones_pron5d_text(source_text)
     return aggregate_daily_precipitation(records)
 
@@ -201,6 +209,62 @@ def daily_precipitation_to_jsonl(records: Iterable[DailyPrecipitation]) -> str:
     return "\n".join(json.dumps(record.to_dict(), sort_keys=True) for record in records) + "\n"
 
 
+def run_pron5d_ingestion(
+    *,
+    output_path: Path | None = None,
+    url: str = PRON5D_URL,
+    timeout: int = 30,
+) -> str:
+    """Ejecuta la ingesta SMN pron5d y devuelve la salida JSONL.
+
+    Si se indica ``output_path``, también escribe el resultado en disco. Esta
+    función concentra la lógica que después puede reutilizar un DAG de Airflow.
+    """
+
+    forecast = build_daily_misiones_forecast(url=url, timeout=timeout)
+    payload = daily_precipitation_to_jsonl(forecast)
+
+    if output_path is not None:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(payload, encoding="utf-8")
+
+    return payload
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Punto de entrada para ejecutar la ingesta desde consola."""
+
+    parser = argparse.ArgumentParser(
+        description="Descarga pron5d del SMN, filtra Misiones y emite precipitación diaria en JSONL."
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=Path,
+        help="Archivo JSONL de salida. Si se omite, imprime por stdout.",
+    )
+    parser.add_argument(
+        "--url",
+        default=PRON5D_URL,
+        help="URL del ZIP pron5d del SMN.",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Timeout de descarga en segundos.",
+    )
+    args = parser.parse_args(argv)
+
+    payload = run_pron5d_ingestion(output_path=args.output, url=args.url, timeout=args.timeout)
+    if args.output is None:
+        sys.stdout.write(payload)
+    else:
+        sys.stderr.write(f"Pronóstico SMN guardado en {args.output}\n")
+
+    return 0
+
+
 def _is_station_header(stripped: str, lines: list[str], index: int) -> bool:
     if not stripped:
         return False
@@ -228,3 +292,7 @@ def _record_from_match(station: str, row: re.Match[str]) -> HourlyForecast:
         wind_speed_kmh=int(row.group("wind_speed")),
         precipitation_mm=float(row.group("precipitation")),
     )
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

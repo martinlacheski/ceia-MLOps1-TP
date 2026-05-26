@@ -6,8 +6,10 @@ from ceml_rain.smn.pron5d import (
     build_daily_misiones_forecast,
     daily_precipitation_to_jsonl,
     fetch_pron5d_text,
+    main,
     parse_misiones_pron5d_text,
     parse_pron5d_text,
+    run_pron5d_ingestion,
 )
 
 __all__ = [
@@ -18,6 +20,8 @@ __all__ = [
     "build_daily_misiones_forecast",
     "daily_precipitation_to_jsonl",
     "fetch_pron5d_text",
+    "main",
     "parse_misiones_pron5d_text",
     "parse_pron5d_text",
+    "run_pron5d_ingestion",
 ]
