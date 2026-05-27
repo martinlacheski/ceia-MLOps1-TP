@@ -1,12 +1,12 @@
 # ML-RainOps: predicción de lluvia para planificación de guardias en CEML
 
-Proyecto MLOps para el TP Final de **Operaciones de Aprendizaje Automático I** de la Carrera de Especialización en Inteligencia Artificial de la Universidad de Buenos Aires. 
+Proyecto MLOps para el TP Final de **Operaciones de Aprendizaje Automático I** de la Carrera de Especialización en Inteligencia Artificial de la Universidad de Buenos Aires.
 
 El caso de uso está orientado a la **Cooperativa de Electricidad de Montecarlo Limitada (CEML)** y busca anticipar la carga operativa en Montecarlo, Misiones, para apoyar la planificación de guardias y cuadrillas, mediante la predicción de lluvia.
 
-La propuesta combina un modelo local entrenado con histórico diario de lluvia en la localidad de Montecarlo, y el pronóstico a 5 días del Servicio Meteorológico Nacional (SMN). 
+La propuesta combina un modelo local entrenado con histórico diario de lluvia en la localidad de Montecarlo, y el pronóstico a 5 días del Servicio Meteorológico Nacional (SMN).
 
-El objetivo del trabajo es obtener un sistema reproducible, trazable y operable. 
+El objetivo del trabajo es obtener un sistema reproducible, trazable y operable.
 
 ### **Autor:** Martín Anibal Lacheski
 
@@ -32,10 +32,10 @@ Este proyecto busca responder una pregunta concreta:
 
 El sistema combina dos fuentes:
 
-| Fuente | Uso |
-|---|---|
-| Histórico local de lluvia | Entrenar un modelo para estimar lluvia del día siguiente. |
-| Pronóstico SMN `pron5d` | Obtener precipitación futura por estación meteorológica de Misiones. |
+| Fuente                    | Uso                                                                  |
+| ------------------------- | -------------------------------------------------------------------- |
+| Histórico local de lluvia | Entrenar un modelo para estimar lluvia del día siguiente.            |
+| Pronóstico SMN `pron5d`   | Obtener precipitación futura por estación meteorológica de Misiones. |
 
 Con esas señales se genera una recomendación operativa:
 
@@ -75,9 +75,12 @@ El proyecto ya cuenta con una primera base ejecutable:
 - [x] MinIO con buckets `data` y `mlflow`.
 - [x] MLflow usando PostgreSQL como backend store y MinIO como artifact store.
 - [x] Airflow 3 levantando con CeleryExecutor y Valkey.
-- [ ] Parser real del pronóstico SMN.
+- [x] Parser real del pronóstico SMN `pron5d`.
+- [x] DAG Airflow para ingesta SMN con persistencia en MinIO.
+- [x] Dataset supervisado inicial de lluvia `t+1`.
+- [x] Comparación de baselines iniciales para lluvia `t+1`.
 - [ ] Entrenamiento real del modelo local de lluvia.
-- [ ] DAGs reales de ingesta, entrenamiento y predicción.
+- [ ] DAGs reales de entrenamiento y predicción.
 
 ## Estructura principal
 
@@ -156,25 +159,25 @@ ml-rainops/
 
 ## Servicios del stack
 
-| Servicio | Rol | URL local por defecto |
-|---|---|---|
-| Frontend | Interfaz de uso del sistema | http://localhost:5173 |
-| FastAPI | API de predicción y recomendación | http://localhost:8000 |
-| Swagger | Documentación interactiva de API | http://localhost:8000/docs |
-| Airflow | Orquestación de pipelines | http://localhost:8080 |
-| MLflow | Tracking de experimentos y modelos | http://localhost:5000 |
-| MinIO | Almacenamiento S3-compatible | http://localhost:9001 |
-| PostgreSQL | Metadatos de Airflow, MLflow y app | localhost:5432 |
-| Valkey | Broker de Celery para Airflow | Interno del compose |
+| Servicio   | Rol                                | URL local por defecto      |
+| ---------- | ---------------------------------- | -------------------------- |
+| Frontend   | Interfaz de uso del sistema        | http://localhost:5173      |
+| FastAPI    | API de predicción y recomendación  | http://localhost:8000      |
+| Swagger    | Documentación interactiva de API   | http://localhost:8000/docs |
+| Airflow    | Orquestación de pipelines          | http://localhost:8080      |
+| MLflow     | Tracking de experimentos y modelos | http://localhost:5000      |
+| MinIO      | Almacenamiento S3-compatible       | http://localhost:9001      |
+| PostgreSQL | Metadatos de Airflow, MLflow y app | localhost:5432             |
+| Valkey     | Broker de Celery para Airflow      | Interno del compose        |
 
-Airflow y MLflow usan PostgreSQL como backend de metadatos. MLflow guarda artefactos en MinIO usando buckets S3-compatible. Esta decisión evita SQLite desde el inicio y deja una arquitectura más cercana al TP de referencia.
+Airflow y MLflow usan PostgreSQL como backend de metadatos. MLflow guarda artefactos en MinIO usando buckets S3-compatible.
 
 Buckets creados al levantar el stack:
 
-| Bucket | Uso |
-|---|---|
-| `mlflow` | Artefactos de experimentos y modelos registrados. |
-| `data` | Datasets, predicciones batch y salidas intermedias del pipeline. |
+| Bucket   | Uso                                                              |
+| -------- | ---------------------------------------------------------------- |
+| `mlflow` | Artefactos de experimentos y modelos registrados.                |
+| `data`   | Datasets, predicciones batch y salidas intermedias del pipeline. |
 
 Los nombres se pueden cambiar desde `.env` con `MLFLOW_BUCKET_NAME` y `DATA_REPO_BUCKET_NAME`.
 
@@ -190,14 +193,14 @@ Rango histórico relevado hasta ahora:
 
 La fuente externa para pronóstico futuro es provista por el [Pronóstico de 5 días del Servicio Meteorológico Nacional de Argentina](https://ssl.smn.gob.ar/dpd/zipopendata.php?dato=pron5d) y el listado de [estaciones meteorológicas](https://ssl.smn.gob.ar/dpd/zipopendata.php?dato=estaciones).
 
-Para Misiones se consideran inicialmente:
+En Misiones existen las siguientes estaciones metereológicas:
 
 - `POSADAS_AERO`
 - `IGUAZU_AERO`
 - `OBERA_AERO`
 - `BERNARDO_DE_IRIGOYEN_AERO`
 
-### Importante sobre los datos
+### Sobre los datos
 
 Los datos históricos de CEML se usan únicamente con fines académicos y de evaluación del trabajo práctico. No forman parte de una licencia abierta del código ni deben redistribuirse sin autorización.
 
@@ -212,8 +215,6 @@ Por lo tanto:
 - Docker y Docker Compose.
 - Puertos disponibles o configurables desde `.env`.
 - Memoria suficiente para correr Airflow, MLflow, MinIO, Postgres, frontend y API al mismo tiempo.
-
-> Airflow es pesado. No es un bug, es una realidad. Si la máquina está justa de RAM, conviene levantar solo los servicios necesarios para la tarea del momento.
 
 ## Configuración local
 
