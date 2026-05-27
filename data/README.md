@@ -1,6 +1,6 @@
 # Datos usados por ML-RainOps
 
-Esta carpeta versiona los datos mínimos necesarios para que el profesor pueda revisar el avance del TP sin depender del workspace original de Aprendizaje de Máquina. Los archivos provienen del proyecto previo de AMQ sobre lluvia y operación de CEML, y se usan acá como base histórica para entrenar el modelo de lluvia `t+1`.
+Esta carpeta versiona los datos mínimos necesarios para que el profesor pueda revisar el avance del TP sin depender del workspace original de Aprendizaje de Máquina. Incluye datos históricos provenientes del proyecto previo de AMQ y artifacts generados por la ingesta SMN del stack MLOps.
 
 ## Archivos incluidos
 
@@ -12,6 +12,7 @@ Esta carpeta versiona los datos mínimos necesarios para que el profesor pueda r
 | `raw/rain/rainfall_manual_recovered_months.csv` | Recuperaciones manuales usadas para completar meses problemáticos del OCR. | Evidencia de corrección de fuente. |
 | `reports/phase3_rainfall_audit.md` | Reporte original de auditoría de lluvia. | Explica reglas de limpieza. |
 | `reports/rain_feature_notes.md` | Notas sobre variables derivadas de observaciones de lluvia. | Referencia para features futuras. |
+| `processed/smn_pron5d_daily.jsonl` | Última salida local generada por el DAG de ingesta SMN. | Evidencia de ingesta externa diaria y entrada futura para recomendación. |
 
 ## Cómo se obtuvieron en AMQ
 
@@ -106,7 +107,27 @@ Para la primera entrega, estos datos permiten demostrar un avance real del model
 
 ## Relación con SMN
 
-El histórico CEML representa la señal local observada. El pronóstico SMN `pron5d`, procesado desde `src/ceml_rain/smn/`, representa la señal externa futura. La recomendación operativa final combinará ambas fuentes:
+El histórico CEML representa la señal local observada. El pronóstico SMN `pron5d`, procesado desde `src/ceml_rain/smn/`, representa la señal externa futura.
+
+La ingesta SMN puede ejecutarse desde consola:
+
+```bash
+PYTHONPATH=src python3 -m ceml_rain.smn --output data/processed/smn_pron5d_daily.jsonl
+```
+
+También queda orquestada por el DAG de Airflow:
+
+```text
+smn_pron5d_ingestion
+```
+
+Ese DAG guarda el JSONL en `data/processed/smn_pron5d_daily.jsonl` y lo sube al bucket MinIO `data` bajo la clave:
+
+```text
+smn/pron5d/processed/forecast_daily_precipitation_YYYY-MM-DD.jsonl
+```
+
+La recomendación operativa final combinará ambas fuentes:
 
 ```text
 histórico CEML -> modelo local t+1

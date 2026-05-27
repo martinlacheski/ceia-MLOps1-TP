@@ -23,13 +23,15 @@ x-airflow-common: &airflow-common
     AWS_ENDPOINT_URL_S3: http://minio:9000
     MLFLOW_S3_ENDPOINT_URL: http://minio:9000
     MLFLOW_TRACKING_URI: http://mlflow:5000
+    DATA_REPO_BUCKET_NAME: ${DATA_REPO_BUCKET_NAME:-data}
   volumes:
-    - ./airflow/dags:/opt/airflow/dags
+    - ./dags:/opt/airflow/dags
     - ./airflow/logs:/opt/airflow/logs
     - ./airflow/config:/opt/airflow/config
     - ./airflow/plugins:/opt/airflow/plugins
     - ./airflow/secrets:/opt/secrets
     - ./src:/opt/ml-rainops/src
+    - ./data:/opt/ml-rainops/data
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     postgres:
