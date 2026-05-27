@@ -13,6 +13,8 @@ Esta carpeta versiona los datos mínimos necesarios para que el profesor pueda r
 | `reports/phase3_rainfall_audit.md` | Reporte original de auditoría de lluvia. | Explica reglas de limpieza. |
 | `reports/rain_feature_notes.md` | Notas sobre variables derivadas de observaciones de lluvia. | Referencia para features futuras. |
 | `processed/smn_pron5d_daily.jsonl` | Última salida local generada por el DAG de ingesta SMN. | Evidencia de ingesta externa diaria y entrada futura para recomendación. |
+| `processed/rain_training_base.parquet` | Dataset supervisado inicial generado desde la lluvia histórica AMQ. | Base para baseline y entrenamiento del modelo `t+1`. |
+| `reports/rain_training_base_summary.json` | Resumen auditable del dataset supervisado. | Control rápido de filas, columnas, ventana temporal y distribución del target. |
 
 ## Cómo se obtuvieron en AMQ
 
@@ -104,6 +106,22 @@ Para la primera entrega, estos datos permiten demostrar un avance real del model
    ```
 
 5. Entrenar baseline/modelo inicial y registrar experimento en MLflow.
+
+El dataset supervisado inicial se genera con:
+
+```bash
+PYTHONPATH=src python3 -m ceml_rain.training \
+  --input data/processed/lluvia_diaria_clean.parquet \
+  --output data/processed/rain_training_base.parquet \
+  --summary data/reports/rain_training_base_summary.json
+```
+
+La salida actual contiene:
+
+- filas: `1885`,
+- ventana: `2021-01-31 -> 2026-03-30`,
+- target positivo `y_llueve_t1`: `554` filas,
+- tasa de lluvia del target: `0.2939`.
 
 ## Relación con SMN
 
