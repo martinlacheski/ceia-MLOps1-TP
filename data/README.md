@@ -15,6 +15,7 @@ Esta carpeta versiona los datos mínimos necesarios para que el profesor pueda r
 | `processed/smn_pron5d_daily.jsonl` | Última salida local generada por el DAG de ingesta SMN. | Evidencia de ingesta externa diaria y entrada futura para recomendación. |
 | `processed/rain_training_base.parquet` | Dataset supervisado inicial generado desde la lluvia histórica AMQ. | Base para baseline y entrenamiento del modelo `t+1`. |
 | `reports/rain_training_base_summary.json` | Resumen auditable del dataset supervisado. | Control rápido de filas, columnas, ventana temporal y distribución del target. |
+| `reports/rain_baseline_metrics.json` | Métricas del baseline heurístico inicial. | Primera vara comparativa antes de entrenar modelos ML. |
 
 ## Cómo se obtuvieron en AMQ
 
@@ -122,6 +123,32 @@ La salida actual contiene:
 - ventana: `2021-01-31 -> 2026-03-30`,
 - target positivo `y_llueve_t1`: `554` filas,
 - tasa de lluvia del target: `0.2939`.
+
+Como el TP AMQ original usaba la lluvia como una feature dentro de un baseline operativo más amplio, en ML-RainOps se implementa una comparación específica para la dimensión lluvia `t+1`.
+
+Los baselines se ejecutan con:
+
+```bash
+PYTHONPATH=src python3 -m ceml_rain.training.baseline \
+  --input data/processed/rain_training_base.parquet \
+  --output data/reports/rain_baseline_metrics.json
+```
+
+Las reglas comparadas son:
+
+- `recent_rain_any_7d`: predice lluvia si hubo al menos un día lluvioso en los últimos 7 días.
+- `recent_rain_mm_7d`: predice lluvia si la lluvia acumulada de los últimos 7 días es `>= 10 mm`.
+- `monthly_rate_or_recent_mm_7d`: predice lluvia si la tasa histórica mensual past-only es `>= 0.35` o si la lluvia acumulada de los últimos 7 días es `>= 10 mm`.
+
+Métricas actuales:
+
+| Baseline | Accuracy | Precision | Recall | F1 |
+|---|---:|---:|---:|---:|
+| `recent_rain_any_7d` | `0.3565` | `0.2942` | `0.8502` | `0.4371` |
+| `recent_rain_mm_7d` | `0.4297` | `0.2944` | `0.6733` | `0.4097` |
+| `monthly_rate_or_recent_mm_7d` | `0.4249` | `0.2995` | `0.7148` | `0.4222` |
+
+La mejor regla por F1 es `recent_rain_any_7d`, aunque sobrepredice lluvia. Las otras reglas son más conservadoras y sirven para mostrar la tensión entre recall y falsos positivos. Este benchmark es una vara inicial para modelos posteriores, no una solución final.
 
 ## Relación con SMN
 

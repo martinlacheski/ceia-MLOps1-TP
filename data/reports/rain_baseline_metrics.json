@@ -1,0 +1,68 @@
+{
+  "evaluation_type": "rain_t1_baseline_comparison",
+  "input_rows": 1885,
+  "date_min": "2021-01-31",
+  "date_max": "2026-03-30",
+  "positive_rate_real": 0.2939,
+  "parameters": {
+    "rolling_7_threshold_mm": 10.0,
+    "monthly_rate_threshold": 0.35
+  },
+  "baselines": [
+    {
+      "baseline_name": "recent_rain_any_7d",
+      "rule": "Predice lluvia mañana si hubo al menos un día con lluvia en los últimos 7 días.",
+      "positive_rate_predicted": 0.8493,
+      "metrics": {
+        "accuracy": 0.3565,
+        "precision": 0.2942,
+        "recall": 0.8502,
+        "f1": 0.4371
+      },
+      "confusion_matrix": {
+        "true_positive": 471,
+        "true_negative": 201,
+        "false_positive": 1130,
+        "false_negative": 83
+      }
+    },
+    {
+      "baseline_name": "recent_rain_mm_7d",
+      "rule": "Predice lluvia mañana si la lluvia acumulada de los últimos 7 días es >= 10.0 mm.",
+      "positive_rate_predicted": 0.6721,
+      "metrics": {
+        "accuracy": 0.4297,
+        "precision": 0.2944,
+        "recall": 0.6733,
+        "f1": 0.4097
+      },
+      "confusion_matrix": {
+        "true_positive": 373,
+        "true_negative": 437,
+        "false_positive": 894,
+        "false_negative": 181
+      }
+    },
+    {
+      "baseline_name": "monthly_rate_or_recent_mm_7d",
+      "rule": "Predice lluvia mañana si la tasa histórica past-only del mes es >= 0.35 o si la lluvia acumulada de los últimos 7 días es >= 10.0 mm.",
+      "positive_rate_predicted": 0.7013,
+      "metrics": {
+        "accuracy": 0.4249,
+        "precision": 0.2995,
+        "recall": 0.7148,
+        "f1": 0.4222
+      },
+      "confusion_matrix": {
+        "true_positive": 396,
+        "true_negative": 405,
+        "false_positive": 926,
+        "false_negative": 158
+      }
+    }
+  ],
+  "best_by_f1": "recent_rain_any_7d",
+  "note": "AMQ usó la lluvia como feature dentro de un baseline operativo más amplio. En ML-RainOps se compara un baseline específico para la dimensión lluvia t+1.",
+  "input_path": "data/processed/rain_training_base.parquet",
+  "output_path": "data/reports/rain_baseline_metrics.json"
+}
