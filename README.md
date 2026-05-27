@@ -82,6 +82,8 @@ El proyecto ya cuenta con una primera base ejecutable:
 - [ ] Entrenamiento real del modelo local de lluvia.
 - [ ] DAGs reales de entrenamiento y predicción.
 
+El reporte de entrega parcial está disponible en [`partial-delivery.md`](./partial-delivery.md).
+
 ## Estructura principal
 
 ```text

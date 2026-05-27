@@ -24,16 +24,19 @@ El criterio de aprobación para nivel contenedores pide implementar el modelo de
 
 Esta parcial ya incluye:
 
-| Requisito / tema | Estado actual |
-|---|---|
-| Docker Compose | Stack completo levantable localmente. |
-| FastAPI | API con JWT y endpoint protegido de recomendación. |
-| Airflow | DAG real de ingesta SMN ejecutado con éxito. |
-| MLflow | Servicio disponible con backend PostgreSQL y artifacts en MinIO. |
-| MinIO/S3 | Buckets `data` y `mlflow`; artifact SMN subido al bucket `data`. |
-| Datos AMQ | Histórico de lluvia versionado en `data/`. |
-| Modelado inicial | Dataset supervisado `t+1` y comparación de baselines. |
-| Documentación | README principal, documentación de datos y este documento de entrega parcial. |
+| Requisito / tema | Estado actual                                                                 |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Docker Compose   | Stack completo levantable localmente.                                         |
+| FastAPI          | API con JWT y endpoint protegido de recomendación.                            |
+| Frontend         | Interfaz web agregada para probar login, endpoint protegido y recomendación.  |
+| Airflow          | DAG real de ingesta SMN ejecutado con éxito.                                  |
+| MLflow           | Servicio disponible con backend PostgreSQL y artifacts en MinIO.              |
+| MinIO/S3         | Buckets `data` y `mlflow`; artifact SMN subido al bucket `data`.              |
+| Datos AMQ        | Histórico de lluvia versionado en `data/`.                                    |
+| Modelado inicial | Dataset supervisado `t+1` y comparación de baselines.                         |
+| Documentación    | README principal, documentación de datos y este documento de entrega parcial. |
+
+El frontend no reemplaza a FastAPI ni forma parte del stack base obligatorio de la materia. Se agrega como mejora de usabilidad para que la revisión pueda probar visualmente el flujo disponible: autenticación demo, consumo del endpoint protegido y visualización de la respuesta operativa.
 
 ## Qué está implementado
 
@@ -42,12 +45,14 @@ Esta parcial ya incluye:
 Servicios actuales:
 
 - FastAPI: `http://localhost:8000`
-- Frontend: `http://localhost:5173`
+- Frontend de prueba: `http://localhost:5173`
 - Airflow: `http://localhost:8080`
 - MLflow: `http://localhost:5000`
 - MinIO: `http://localhost:9001`
 - PostgreSQL
 - Valkey
+
+El frontend permite probar el flujo completo disponible en esta etapa: login demo, llamada al endpoint protegido y visualización de la recomendación provisoria.
 
 ### Ingesta SMN `pron5d`
 
@@ -124,12 +129,12 @@ PYTHONPATH=src python3 -m ceml_rain.training \
 
 Resumen actual:
 
-| Métrica | Valor |
-|---|---:|
-| Filas | `1885` |
-| Ventana | `2021-01-31 -> 2026-03-30` |
-| Positivos `y_llueve_t1` | `554` |
-| Tasa positiva | `0.2939` |
+| Métrica                 |                      Valor |
+| ----------------------- | -------------------------: |
+| Filas                   |                     `1885` |
+| Ventana                 | `2021-01-31 -> 2026-03-30` |
+| Positivos `y_llueve_t1` |                      `554` |
+| Tasa positiva           |                   `0.2939` |
 
 Features incluidas:
 
@@ -153,19 +158,19 @@ PYTHONPATH=src python3 -m ceml_rain.training.baseline \
 
 Baselines comparados:
 
-| Baseline | Regla |
-|---|---|
-| `recent_rain_any_7d` | Predice lluvia si hubo al menos un día lluvioso en los últimos 7 días. |
-| `recent_rain_mm_7d` | Predice lluvia si el acumulado de los últimos 7 días es `>= 10 mm`. |
+| Baseline                       | Regla                                                                                                   |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `recent_rain_any_7d`           | Predice lluvia si hubo al menos un día lluvioso en los últimos 7 días.                                  |
+| `recent_rain_mm_7d`            | Predice lluvia si el acumulado de los últimos 7 días es `>= 10 mm`.                                     |
 | `monthly_rate_or_recent_mm_7d` | Predice lluvia si la tasa histórica mensual past-only es `>= 0.35` o el acumulado 7 días es `>= 10 mm`. |
 
 Métricas actuales:
 
-| Baseline | Accuracy | Precision | Recall | F1 |
-|---|---:|---:|---:|---:|
-| `recent_rain_any_7d` | `0.3565` | `0.2942` | `0.8502` | `0.4371` |
-| `recent_rain_mm_7d` | `0.4297` | `0.2944` | `0.6733` | `0.4097` |
-| `monthly_rate_or_recent_mm_7d` | `0.4249` | `0.2995` | `0.7148` | `0.4222` |
+| Baseline                       | Accuracy | Precision |   Recall |       F1 |
+| ------------------------------ | -------: | --------: | -------: | -------: |
+| `recent_rain_any_7d`           | `0.3565` |  `0.2942` | `0.8502` | `0.4371` |
+| `recent_rain_mm_7d`            | `0.4297` |  `0.2944` | `0.6733` | `0.4097` |
+| `monthly_rate_or_recent_mm_7d` | `0.4249` |  `0.2995` | `0.7148` | `0.4222` |
 
 Lectura: `recent_rain_any_7d` gana por F1 por su recall alto, pero sobrepredice lluvia. Las reglas con umbral son más conservadoras. Este benchmark deja una vara inicial para modelos posteriores.
 
@@ -255,13 +260,3 @@ docker compose exec airflow-scheduler bash -lc 'cd /opt/ml-rainops && PYTHONPATH
 5. Reemplazar el endpoint provisorio por inferencia real.
 6. Actualizar frontend para mostrar recomendación real.
 7. Completar README final con instrucciones de operación.
-
-## Evidencias sugeridas para acompañar la entrega
-
-- Captura de `docker compose ps`.
-- Captura de Airflow con DAG `smn_pron5d_ingestion` en `success`.
-- Captura de MinIO con artifact SMN en bucket `data`.
-- Captura de MLflow UI.
-- Captura de Swagger `/docs`.
-- Captura del frontend.
-- Archivos `data/reports/rain_training_base_summary.json` y `data/reports/rain_baseline_metrics.json`.
