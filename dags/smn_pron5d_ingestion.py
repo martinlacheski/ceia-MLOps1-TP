@@ -23,7 +23,7 @@ if str(SRC_DIR) not in sys.path:
 @dag(
     dag_id="smn_pron5d_ingestion",
     description="Ingesta el pronóstico SMN pron5d de Misiones y lo persiste en data local y MinIO.",
-    schedule=None,
+    schedule="0 9 * * *",
     start_date=datetime(2026, 1, 1),
     catchup=False,
     tags=["smn", "pron5d", "rainops"],
