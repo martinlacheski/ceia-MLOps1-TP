@@ -18,7 +18,7 @@ El objetivo del trabajo es obtener un sistema reproducible, trazable y operable.
 - **MLflow configurado con PostgreSQL + MinIO** para tracking de experimentos y artefactos.
 - **Airflow 3 con CeleryExecutor** preparado para DAGs de ingesta SMN, entrenamiento y predicción diaria.
 - **Estructura de paquete Python** en `src/ceml_rain/` para separar parsing, entrenamiento e inferencia.
-- **Documentación inicial** de arquitectura y ejecución local.
+- **Documentación de arquitectura, ejecución local y operación del flujo MLOps.**
 
 ## Problema
 
@@ -47,23 +47,44 @@ Ejemplo de respuesta esperada de la API:
 
 ```json
 {
-  "predicted_date": "2026-05-27",
-  "local_model": {
-    "rain_probability": 0.72,
+  "target_date": "2026-06-17",
+  "prediction": {
+    "source": "local_model",
+    "model_name": "ceml-rain-rain-t1-classifier",
+    "model_stage": "latest_registered",
+    "rain_probability": 0.35,
+    "threshold": 0.30,
     "will_rain": true
   },
-  "smn": {
+  "forecast": {
+    "source": "SMN pron5d",
     "reference_station": "OBERA_AERO",
-    "daily_precipitation_mm": 4.2,
+    "precipitation_mm": 4.2,
     "will_rain": true
   },
-  "recommended_guard": "reforzada"
+  "decision": {
+    "recommended_guard": "reforzada",
+    "risk_level": "alto",
+    "reason": "El modelo local supera el umbral operativo y el pronóstico SMN informa precipitación."
+  },
+  "metadata": {
+    "generated_at": "2026-06-16T11:30:00Z",
+    "mode": "model_artifact_and_smn",
+    "training_summary_path": "data/reports/rain_t1_training_summary.json"
+  }
 }
 ```
 
+Secciones del contrato:
+
+- `prediction`: señal del modelo local y umbral operativo usado para decidir lluvia.
+- `forecast`: señal externa del SMN con estación de referencia y precipitación esperada.
+- `decision`: recomendación de guardia, nivel de riesgo y motivo operativo legible.
+- `metadata`: trazabilidad mínima del momento y modo de generación de la respuesta.
+
 ## Estado actual
 
-El proyecto ya cuenta con una primera base ejecutable:
+El proyecto ya cuenta con un circuito MLOps mínimo ejecutable:
 
 - [x] Estructura inicial del repositorio.
 - [x] `docker-compose.yaml` con servicios base.
@@ -79,10 +100,12 @@ El proyecto ya cuenta con una primera base ejecutable:
 - [x] DAG Airflow para ingesta SMN con persistencia en MinIO.
 - [x] Dataset supervisado inicial de lluvia `t+1`.
 - [x] Comparación de baselines iniciales para lluvia `t+1`.
-- [ ] Entrenamiento real del modelo local de lluvia.
-- [ ] DAGs reales de entrenamiento y predicción.
+- [x] Primer entrenamiento supervisado de lluvia `t+1` con tracking en MLflow.
+- [x] DAG real de entrenamiento supervisado en Airflow.
+- [x] Promoción de artefacto local de serving desde entrenamiento.
+- [x] Endpoint protegido con recomendación real basada en artefacto local + SMN.
 
-El reporte de entrega parcial está disponible en [`partial-delivery.md`](./partial-delivery.md).
+Queda como mejora futura opcional agregar un DAG de predicción batch diaria. Para esta entrega, la recomendación operativa ya está disponible de forma on-demand desde el endpoint protegido y el frontend.
 
 ## Estructura principal
 
@@ -125,12 +148,143 @@ ml-rainops/
 - `docker-compose.yaml` — definición del stack local.
 - `docker/airflow/` — imagen extendida de Airflow con dependencias MLOps.
 - `docker/mlflow/` — imagen extendida de MLflow con soporte PostgreSQL y S3.
-- `docker/postgres/init-multiple-databases.sh` — creación de bases `airflow_db`, `mlflow_db` y `rainops_app`.
+- `docker/postgres/` — imagen de PostgreSQL con inicialización reproducible de bases `airflow_db`, `mlflow_db` y `rainops_app`.
 - `airflow/secrets/` — variables y conexiones locales para Airflow.
-- `src/ceml_rain/smn/` — espacio reservado para parser del SMN.
-- `src/ceml_rain/training/` — espacio reservado para entrenamiento del modelo local.
-- `src/ceml_rain/inference/` — espacio reservado para lógica de inferencia/recomendación.
+- `src/ceml_rain/smn/` — parser del pronóstico SMN `pron5d` y serialización de precipitación diaria.
+- `src/ceml_rain/training/` — generación del dataset supervisado, baselines y entrenamiento supervisado con MLflow.
+- `src/ceml_rain/inference/` — lógica de serving, inferencia local y recomendación modelo + SMN.
 - `docs/architecture.md` — decisiones iniciales de arquitectura.
+
+## Entrenamiento supervisado `rain t+1`
+
+El trabajo previo de AMQ mostró que **XGBoost** era un candidato fuerte para targets operativos de regresión (costo, reclamos y tiempo). En ML-RainOps no se copia ese resultado de forma ciega: el target cambió a una **clasificación binaria** (`y_llueve_t1`), así que el primer workflow reevalúa candidatos defendibles con split temporal y logging completo en MLflow.
+
+Comando local o dentro del contenedor de Airflow:
+
+```bash
+PYTHONPATH=src python3 -m ceml_rain.training.train \
+  --input data/processed/rain_training_base.parquet \
+  --output data/reports/rain_t1_training_summary.json \
+  --serving-output-dir data/models/rain_t1/current
+```
+
+El script entrena `LogisticRegression` y `RandomForest` siempre, e incorpora `XGBoost` cuando la dependencia está disponible. La selección prioriza **average precision** si existe score probabilístico; si no, usa **F1** para balancear precisión/recall sobre un target desbalanceado.
+
+Durante `airflow-init`, el stack prepara permisos de `data/processed/` y `data/reports/` para que los DAGs puedan escribir sus salidas sobre los bind-mounts sin pasos manuales.
+
+Resultado actual versionado para revisión rápida:
+
+```text
+data/reports/rain_t1_training_summary.json
+```
+
+Ese archivo permite ver métricas, split temporal, candidatos evaluados y modelo elegido sin depender de que MLflow conserve estado local.
+
+Además, cada entrenamiento exitoso promueve un bundle estable de serving en:
+
+```text
+data/models/rain_t1/current/
+```
+
+Contenido esperado:
+
+- `model.joblib` — modelo serializado para la API.
+- `metadata.json` — features exactas, threshold operativo, métricas y referencia al resumen de entrenamiento.
+
+## Ejecutar el entrenamiento desde Airflow UI
+
+1. Abrí Airflow en http://localhost:8080.
+2. Habilitá y dispará manualmente el DAG `rain_t1_training`.
+3. Revisá la corrida y los artefactos en MLflow: http://localhost:5000.
+4. El resumen JSON local queda en `data/reports/rain_t1_training_summary.json`.
+5. El artefacto promovido para serving queda en `data/models/rain_t1/current/`.
+
+El DAG usa por defecto `MLFLOW_TRACKING_URI=http://mlflow:5000` dentro de Docker, pero permite override por variable de entorno si necesitás apuntar a otro tracking server.
+
+## Ejecutar la ingesta SMN desde Airflow UI
+
+Al levantar el stack, el servicio `smn-bootstrap` ejecuta una ingesta inicial para dejar disponible:
+
+```text
+data/processed/smn_pron5d_daily.jsonl
+```
+
+Además, Airflow mantiene el DAG `smn_pron5d_ingestion` programado todos los días a las `09:00 UTC` y también permite dispararlo manualmente:
+
+1. Abrí Airflow en http://localhost:8080.
+2. Habilitá o dispará manualmente el DAG `smn_pron5d_ingestion`.
+3. Verificá la salida procesada en `data/processed/smn_pron5d_daily.jsonl`.
+
+## Probar la recomendación real
+
+Una vez ejecutados los DAGs `smn_pron5d_ingestion` y `rain_t1_training`, la API usa:
+
+- artefacto local promovido en `data/models/rain_t1/current/`,
+- dataset supervisado `data/processed/rain_training_base.parquet`,
+- pronóstico `data/processed/smn_pron5d_daily.jsonl`.
+
+El stack también ejecuta `smn-bootstrap` al levantar Docker para dejar una primera versión del pronóstico procesado antes de usar la API.
+
+Comandos demo:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -H 'Content-Type: application/x-www-form-urlencoded' \
+  -d 'username=operador&password=rainops-dev' | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+curl -s -X POST http://localhost:8000/api/predictions/guard-recommendation \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"target_date":"2026-05-29"}'
+```
+
+Ejemplo de corrida validada con SMN actualizado para `2026-06-19`:
+
+```text
+prediction.rain_probability = 0.6322
+prediction.will_rain = true
+forecast.reference_station = OBERA_AERO
+forecast.precipitation_mm = 24.2
+forecast.will_rain = true
+```
+
+La respuesta incluye `metadata.degradation_reasons` cuando corresponde. En la corrida validada, el endpoint informó:
+
+```text
+Prediction alignment: beyond_available_local_features
+```
+
+Esto significa que el SMN estaba actualizado, pero la última fila de features locales disponible era anterior a la fecha objetivo. Es una limitación honesta de datos históricos, no un fallback silencioso.
+
+El histórico de lluvia AMQ/CEML se usa como fuente observada para entrenamiento y construcción de features pasadas. No se extiende con el pronóstico SMN, porque SMN `pron5d` es una fuente futura de contraste operativo, no lluvia observada. Incorporar pronóstico como si fuera observación mezclaría fuentes y contaminaría el entrenamiento. Para extender el histórico local harían falta nuevos registros observados de CEML u otra fuente observada documentada explícitamente.
+
+La UI demo del frontend sigue disponible en http://localhost:5173.
+
+Última corrida validada:
+
+| Campo | Valor |
+| --- | --- |
+| Experimento MLflow | `rain-t1-training` |
+| Modelo registrado | `ceml-rain-rain-t1-classifier` |
+| Mejor modelo aprendido | `xgboost_classifier` |
+| Average precision | `0.3533` |
+| F1 | `0.3492` |
+| Baseline de referencia | `recent_rain_any_7d`, F1 `0.4371` |
+
+Lectura honesta para defensa:
+
+- **XGBoost** sigue siendo el mejor modelo aprendido por **average precision** en este workflow.
+- El baseline `recent_rain_any_7d` todavía tiene **mejor F1** que los modelos aprendidos actuales.
+- Para la entrega final, el foco es la trazabilidad operativa end-to-end; no inflar artificialmente la performance.
+
+El `run_id` y la versión concreta del modelo quedan en el JSON generado por cada corrida. No se fija una versión en la documentación porque, en un entorno limpio, MLflow asigna versiones nuevas desde cero.
+
+Persistencia importante:
+
+- Las corridas de MLflow viven en servicios locales: metadatos en PostgreSQL y artefactos en MinIO.
+- Si se ejecuta `docker compose down`, los volúmenes se conservan y las corridas siguen disponibles.
+- Si se ejecuta `docker compose down -v`, se eliminan los volúmenes y se pierden las corridas locales de MLflow.
+- Para que otra persona vea los experimentos en una instalación nueva, debe levantar el stack y volver a ejecutar el comando de entrenamiento. El repositorio versiona el código, los datos mínimos y el resumen JSON para que esa corrida sea reproducible.
 
 ## Arquitectura actual
 
@@ -195,7 +349,7 @@ Rango histórico relevado hasta ahora:
 
 La fuente externa para pronóstico futuro es provista por el [Pronóstico de 5 días del Servicio Meteorológico Nacional de Argentina](https://ssl.smn.gob.ar/dpd/zipopendata.php?dato=pron5d) y el listado de [estaciones meteorológicas](https://ssl.smn.gob.ar/dpd/zipopendata.php?dato=estaciones).
 
-En Misiones existen las siguientes estaciones metereológicas:
+En Misiones existen las siguientes estaciones meteorológicas:
 
 - `POSADAS_AERO`
 - `IGUAZU_AERO`
@@ -253,6 +407,8 @@ Levantar el stack completo:
 docker compose up --build
 ```
 
+PostgreSQL se construye con una imagen local que copia el script de inicialización dentro de `/docker-entrypoint-initdb.d/`. Esto evita depender de un bind-mount para crear las bases y permite que el stack levante de forma reproducible en Docker Desktop y Linux.
+
 Verificar servicios:
 
 ```bash
@@ -284,6 +440,37 @@ password: minio123
 
 ## Verificación rápida
 
+### 1. Levantar el stack
+
+Desde la raíz del repositorio:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Si ya tenías contenedores creados y cambia alguna dependencia del backend o de Airflow, reconstruir explícitamente antes de probar:
+
+```bash
+docker compose build api airflow-scheduler airflow-worker airflow-init airflow-apiserver airflow-dag-processor airflow-triggerer
+docker compose up --force-recreate
+```
+
+Durante el arranque se ejecutan inicializaciones automáticas:
+
+- PostgreSQL crea las bases de Airflow, MLflow y aplicación desde una imagen propia.
+- MinIO crea los buckets `data` y `mlflow`.
+- `smn-bootstrap` descarga/procesa una primera versión del pronóstico SMN en `data/processed/smn_pron5d_daily.jsonl`.
+- Airflow queda disponible para ejecutar los DAGs desde la UI.
+
+En otra terminal, verificar servicios:
+
+```bash
+docker compose ps
+```
+
+### 2. Validar servicios principales
+
 Con el stack levantado, validar API, MLflow y Airflow:
 
 ```bash
@@ -312,8 +499,74 @@ También se puede probar el flujo desde el frontend:
 
 1. Abrir http://localhost:5173.
 2. Iniciar sesión con el usuario demo.
-3. Consultar una recomendación de guardia de reclamos.
-4. Confirmar que el endpoint protegido devuelve una respuesta JSON.
+3. Consultar una recomendación de guardia.
+4. Ver el resumen operativo.
+5. Usar `Ver detalle` y `Ver JSON` para auditar modelo, SMN, decisión y trazabilidad.
+
+### 3. Ejecutar entrenamiento desde Airflow
+
+El stack puede usar el artefacto versionado en `data/models/rain_t1/current/`, pero para reproducir el entrenamiento y generar evidencia propia:
+
+1. Abrir Airflow: http://localhost:8080.
+2. Iniciar sesión con `airflow / airflow`.
+3. Buscar el DAG `rain_t1_training`.
+4. Presionar `Trigger`.
+5. Confirmar que `train_model` y `persist_summary` terminen en verde.
+
+Esto actualiza:
+
+```text
+data/reports/rain_t1_training_summary.json
+data/models/rain_t1/current/
+```
+
+Y registra corrida/modelo en MLflow:
+
+```text
+http://localhost:5000
+```
+
+### 4. Actualizar pronóstico SMN
+
+El servicio `smn-bootstrap` corre una ingesta inicial al levantar Docker. Además, el DAG `smn_pron5d_ingestion` queda programado diariamente a las `09:00 UTC`.
+
+Para forzar una actualización manual desde Airflow:
+
+1. Abrir http://localhost:8080.
+2. Buscar `smn_pron5d_ingestion`.
+3. Presionar `Trigger`.
+4. Confirmar salida en:
+
+```text
+data/processed/smn_pron5d_daily.jsonl
+```
+
+### 5. Probar endpoint por terminal
+
+Ejemplo usando una fecha disponible en el pronóstico SMN procesado:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=operador&password=rainops-dev" \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["access_token"])')
+
+curl -s -X POST http://localhost:8000/api/predictions/guard-recommendation \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"target_date":"2026-06-19"}' \
+  | python3 -m json.tool
+```
+
+La respuesta debe incluir:
+
+```text
+prediction  -> señal del modelo local promovido
+forecast    -> señal SMN procesada
+metadata    -> trazabilidad y modo de respuesta
+```
+
+Si `metadata.mode` aparece como `degraded_fallback`, revisar `metadata.degradation_reasons`. En la entrega actual esto puede ocurrir porque el histórico observado AMQ/CEML llega hasta marzo de 2026, mientras SMN aporta pronóstico actualizado. Esa limitación está documentada y evita mezclar pronóstico con observación histórica.
 
 ## Flujo operativo esperado
 
@@ -340,13 +593,9 @@ descargar pron5d del SMN
 
 ## Próximos pasos
 
-1. Implementar parser del archivo `pron5d` del SMN.
-2. Guardar pronóstico procesado por estación y día en MinIO.
-3. Incorporar histórico local de lluvia al bucket `data`.
-4. Crear features temporales para lluvia `t+1`.
-5. Entrenar modelo local y registrar experimento en MLflow.
-6. Crear DAG de Airflow para ingesta, entrenamiento y predicción diaria.
-7. Reemplazar el stub de la API por inferencia real.
+1. Mantener actualizado el histórico local observado para reducir el modo degradado cuando la fecha objetivo supera la última ventana de features disponible.
+2. Ajustar umbral/features del modelo para intentar superar el baseline heurístico en F1 sin perder trazabilidad.
+3. Completar una pasada final de documentación y capturas si la entrega exige evidencia visual.
 
 ## Comandos rápidos
 

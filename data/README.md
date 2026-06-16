@@ -16,6 +16,7 @@ Esta carpeta versiona los datos mínimos necesarios para que el profesor pueda r
 | `processed/rain_training_base.parquet` | Dataset supervisado inicial generado desde la lluvia histórica AMQ. | Base para baseline y entrenamiento del modelo `t+1`. |
 | `reports/rain_training_base_summary.json` | Resumen auditable del dataset supervisado. | Control rápido de filas, columnas, ventana temporal y distribución del target. |
 | `reports/rain_baseline_metrics.json` | Métricas del baseline heurístico inicial. | Primera vara comparativa antes de entrenar modelos ML. |
+| `reports/rain_t1_training_summary.json` | Resumen local del primer entrenamiento supervisado con MLflow. | Evidencia rápida de métricas, split temporal y modelo elegido sin abrir MLflow. |
 
 ## Cómo se obtuvieron en AMQ
 
@@ -90,7 +91,7 @@ Las columnas esperadas para la primera etapa son:
 
 ## Uso en ML-RainOps
 
-Para la primera entrega, estos datos permiten demostrar un avance real del modelo desarrollado en AMQ:
+Para ML-RainOps, estos datos sostienen el entrenamiento y la inferencia local basada en histórico observado:
 
 1. Cargar `processed/lluvia_diaria_clean.parquet`.
 2. Crear variable `llovio = lluvia_mm > 0`.
@@ -106,7 +107,7 @@ Para la primera entrega, estos datos permiten demostrar un avance real del model
    y_llueve_t+1 = lluvia_mm del día siguiente > 0
    ```
 
-5. Entrenar baseline/modelo inicial y registrar experimento en MLflow.
+5. Entrenar baselines/modelos supervisados y registrar experimentos en MLflow.
 
 El dataset supervisado inicial se genera con:
 
@@ -172,7 +173,7 @@ Ese DAG guarda el JSONL en `data/processed/smn_pron5d_daily.jsonl` y lo sube al 
 smn/pron5d/processed/forecast_daily_precipitation_YYYY-MM-DD.jsonl
 ```
 
-La recomendación operativa final combinará ambas fuentes:
+La recomendación operativa combina ambas fuentes:
 
 ```text
 histórico CEML -> modelo local t+1
