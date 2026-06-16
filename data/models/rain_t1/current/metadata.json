@@ -1,0 +1,51 @@
+{
+  "generated_at": "2026-06-16T13:15:50.944846+00:00",
+  "model_name": "xgboost_classifier",
+  "registered_model_name": "ceml-rain-rain-t1-classifier",
+  "model_type": "xgboost",
+  "feature_columns": [
+    "dia_anio",
+    "dia_semana",
+    "dias_lluvia_rolling_14",
+    "dias_lluvia_rolling_30",
+    "dias_lluvia_rolling_7",
+    "llovio_lag_1",
+    "llovio_lag_14",
+    "llovio_lag_2",
+    "llovio_lag_3",
+    "llovio_lag_30",
+    "llovio_lag_7",
+    "lluvia_mm_lag_1",
+    "lluvia_mm_lag_14",
+    "lluvia_mm_lag_2",
+    "lluvia_mm_lag_3",
+    "lluvia_mm_lag_30",
+    "lluvia_mm_lag_7",
+    "lluvia_mm_rolling_14_mean",
+    "lluvia_mm_rolling_14_sum",
+    "lluvia_mm_rolling_30_mean",
+    "lluvia_mm_rolling_30_sum",
+    "lluvia_mm_rolling_7_mean",
+    "lluvia_mm_rolling_7_sum",
+    "mes"
+  ],
+  "threshold": 0.3,
+  "metrics": {
+    "accuracy": 0.565,
+    "precision": 0.3188,
+    "recall": 0.386,
+    "f1": 0.3492,
+    "positive_rate_predicted": 0.366,
+    "positive_rate_real": 0.3024,
+    "roc_auc": 0.5469,
+    "average_precision": 0.3533
+  },
+  "training_summary_path": "/tmp/rain_t1_training_summary.json",
+  "model_stage": "current",
+  "mlflow_run_id": "714f0e74f11b4df2b730b31787e27e6b",
+  "registered_model": {
+    "requested_model_name": "ceml-rain-rain-t1-classifier",
+    "status": "registered",
+    "version": "1"
+  }
+}

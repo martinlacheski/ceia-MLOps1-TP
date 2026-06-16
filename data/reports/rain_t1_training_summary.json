@@ -1,0 +1,164 @@
+{
+  "training_type": "rain_t1_supervised_classification",
+  "generated_at": "2026-06-16T13:15:50.944846+00:00",
+  "input_path": "/opt/ml-rainops/data/processed/rain_training_base.parquet",
+  "output_path": "/tmp/rain_t1_training_summary.json",
+  "serving_output_dir": "/opt/ml-rainops/data/models/rain_t1/current",
+  "tracking_uri": "http://mlflow:5000",
+  "experiment_name": "rain-t1-training",
+  "mlflow_run_id": "714f0e74f11b4df2b730b31787e27e6b",
+  "registered_model": {
+    "requested_model_name": "ceml-rain-rain-t1-classifier",
+    "status": "registered",
+    "version": "1"
+  },
+  "selection_policy": "Prefer average precision when available; otherwise use F1 for imbalanced rain_t+1 classification.",
+  "amq_reference": {
+    "note": "AMQ operational regression favored XGBoost, but this workflow re-evaluates candidates for the different binary rain_t+1 target.",
+    "xgboost_candidate_requested": true
+  },
+  "split": {
+    "train_rows": 1508,
+    "test_rows": 377,
+    "train_positive_rate": 0.2918,
+    "test_positive_rate": 0.3024,
+    "train_date_min": "2021-01-31",
+    "train_date_max": "2025-03-18",
+    "test_date_min": "2025-03-19",
+    "test_date_max": "2026-03-30"
+  },
+  "feature_columns": [
+    "dia_anio",
+    "dia_semana",
+    "dias_lluvia_rolling_14",
+    "dias_lluvia_rolling_30",
+    "dias_lluvia_rolling_7",
+    "llovio_lag_1",
+    "llovio_lag_14",
+    "llovio_lag_2",
+    "llovio_lag_3",
+    "llovio_lag_30",
+    "llovio_lag_7",
+    "lluvia_mm_lag_1",
+    "lluvia_mm_lag_14",
+    "lluvia_mm_lag_2",
+    "lluvia_mm_lag_3",
+    "lluvia_mm_lag_30",
+    "lluvia_mm_lag_7",
+    "lluvia_mm_rolling_14_mean",
+    "lluvia_mm_rolling_14_sum",
+    "lluvia_mm_rolling_30_mean",
+    "lluvia_mm_rolling_30_sum",
+    "lluvia_mm_rolling_7_mean",
+    "lluvia_mm_rolling_7_sum",
+    "mes"
+  ],
+  "skipped_candidates": [],
+  "candidate_results": [
+    {
+      "model_name": "logistic_regression",
+      "model_type": "sklearn",
+      "params": {
+        "class_weight": "balanced",
+        "max_iter": 1000,
+        "solver": "lbfgs",
+        "random_state": 42
+      },
+      "metrics": {
+        "accuracy": 0.4934,
+        "precision": 0.2667,
+        "recall": 0.386,
+        "f1": 0.3154,
+        "positive_rate_predicted": 0.4377,
+        "positive_rate_real": 0.3024,
+        "roc_auc": 0.4398,
+        "average_precision": 0.2677
+      },
+      "primary_metric": 0.2677
+    },
+    {
+      "model_name": "random_forest",
+      "model_type": "sklearn",
+      "params": {
+        "n_estimators": 300,
+        "max_depth": 8,
+        "min_samples_leaf": 2,
+        "class_weight": "balanced_subsample",
+        "random_state": 42
+      },
+      "metrics": {
+        "accuracy": 0.6313,
+        "precision": 0.3333,
+        "recall": 0.2193,
+        "f1": 0.2646,
+        "positive_rate_predicted": 0.1989,
+        "positive_rate_real": 0.3024,
+        "roc_auc": 0.5319,
+        "average_precision": 0.3435
+      },
+      "primary_metric": 0.3435
+    },
+    {
+      "model_name": "xgboost_classifier",
+      "model_type": "xgboost",
+      "params": {
+        "n_estimators": 300,
+        "max_depth": 4,
+        "learning_rate": 0.05,
+        "subsample": 0.9,
+        "colsample_bytree": 0.9,
+        "eval_metric": "logloss",
+        "random_state": 42,
+        "scale_pos_weight": 2.4273
+      },
+      "metrics": {
+        "accuracy": 0.565,
+        "precision": 0.3188,
+        "recall": 0.386,
+        "f1": 0.3492,
+        "positive_rate_predicted": 0.366,
+        "positive_rate_real": 0.3024,
+        "roc_auc": 0.5469,
+        "average_precision": 0.3533
+      },
+      "primary_metric": 0.3533
+    }
+  ],
+  "best_model": {
+    "model_name": "xgboost_classifier",
+    "model_type": "xgboost",
+    "params": {
+      "n_estimators": 300,
+      "max_depth": 4,
+      "learning_rate": 0.05,
+      "subsample": 0.9,
+      "colsample_bytree": 0.9,
+      "eval_metric": "logloss",
+      "random_state": 42,
+      "scale_pos_weight": 2.4273
+    },
+    "metrics": {
+      "accuracy": 0.565,
+      "precision": 0.3188,
+      "recall": 0.386,
+      "f1": 0.3492,
+      "positive_rate_predicted": 0.366,
+      "positive_rate_real": 0.3024,
+      "roc_auc": 0.5469,
+      "average_precision": 0.3533
+    },
+    "primary_metric": 0.3533
+  },
+  "baseline_reference": {
+    "source": "/opt/ml-rainops/data/reports/rain_baseline_metrics.json",
+    "best_by_f1": "recent_rain_any_7d",
+    "best_f1": 0.4371
+  },
+  "serving_artifact": {
+    "directory": "/opt/ml-rainops/data/models/rain_t1/current",
+    "model_path": "/opt/ml-rainops/data/models/rain_t1/current/model.joblib",
+    "metadata_path": "/opt/ml-rainops/data/models/rain_t1/current/metadata.json",
+    "threshold": 0.3,
+    "generated_at": "2026-06-16T13:15:50.944846+00:00"
+  }
+}
