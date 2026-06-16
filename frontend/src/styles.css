@@ -12,6 +12,10 @@ body {
   margin: 0;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 button,
 input {
   font: inherit;
@@ -31,6 +35,11 @@ button:hover {
   background: #1c43ad;
 }
 
+button:disabled {
+  cursor: wait;
+  opacity: 0.75;
+}
+
 input {
   width: 100%;
   border: 1px solid #c8d2e4;
@@ -48,7 +57,7 @@ label {
 .page-shell {
   width: min(1540px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 1.25rem 0;
+  padding: 1.5rem 0;
 }
 
 .hero-card,
@@ -62,16 +71,20 @@ label {
 
 .hero-card {
   display: grid;
-  grid-template-columns: minmax(420px, 1.1fr) minmax(360px, 0.9fr);
-  align-items: end;
+  grid-template-columns: minmax(420px, 1.1fr) minmax(340px, 0.9fr);
+  align-items: center;
   gap: 1.5rem;
-  margin-bottom: 1rem;
 }
 
 .hero-card h1 {
   margin: 0;
   font-size: clamp(2rem, 4vw, 3.6rem);
   line-height: 0.98;
+}
+
+.hero-copy {
+  display: grid;
+  gap: 0.9rem;
 }
 
 .hero-card p {
@@ -92,15 +105,46 @@ label {
   text-transform: uppercase;
 }
 
-.dashboard-grid {
+.login-shell {
+  min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(280px, 0.8fr) minmax(300px, 0.8fr) minmax(520px, 1.4fr);
+  place-items: center;
+}
+
+.login-card {
+  width: min(1040px, 100%);
+}
+
+.form-card {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.consultation-shell {
+  display: grid;
   gap: 1rem;
-  align-items: stretch;
+}
+
+.consultation-header {
+  margin-bottom: 0;
+}
+
+.consultation-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.8fr) minmax(0, 1.4fr);
+  gap: 1rem;
+  align-items: start;
 }
 
 .card h2 {
   margin: 0 0 0.8rem;
+}
+
+.consultation-card,
+.result-card,
+.details-card {
+  display: grid;
+  gap: 1rem;
 }
 
 .hint,
@@ -108,11 +152,125 @@ label {
   margin-bottom: 0;
 }
 
+.status-message {
+  color: #31425f;
+}
+
 .result-card {
   min-width: 0;
 }
 
-pre {
+.session-panel {
+  display: grid;
+  justify-items: end;
+  gap: 0.9rem;
+}
+
+.session-chip {
+  min-width: 250px;
+  border: 1px solid #d5def0;
+  border-radius: 18px;
+  padding: 1rem;
+  background: #f7f9fd;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.session-chip-label,
+.summary-eyebrow,
+.detail-section h3 {
+  color: #66738a;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.secondary-button {
+  color: #2454d6;
+  background: #eaf0ff;
+}
+
+.secondary-button:hover {
+  background: #dbe6ff;
+}
+
+.summary-card {
+  border-radius: 18px;
+  padding: 1.2rem;
+  border: 1px solid #dbe3f0;
+  background: linear-gradient(180deg, #f8fbff 0%, #f2f6ff 100%);
+}
+
+.summary-card h3 {
+  margin: 0.25rem 0 0.75rem;
+  font-size: 1.4rem;
+}
+
+.summary-card p {
+  margin: 0;
+}
+
+.summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 0.75rem;
+}
+
+.summary-meta span {
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  background: white;
+  border: 1px solid #d7e0f0;
+  font-weight: 700;
+}
+
+.risk-low {
+  border-color: #cde8d5;
+  background: linear-gradient(180deg, #f7fff9 0%, #eefbf2 100%);
+}
+
+.risk-medium {
+  border-color: #f1dfac;
+  background: linear-gradient(180deg, #fffdf5 0%, #fff7de 100%);
+}
+
+.risk-high {
+  border-color: #f0c4c4;
+  background: linear-gradient(180deg, #fff8f8 0%, #ffeaea 100%);
+}
+
+.empty-state {
+  border: 1px dashed #c8d2e4;
+  border-radius: 18px;
+  padding: 1rem;
+  background: #f9fbff;
+}
+
+.details-card {
+  border: 1px solid #dbe3f0;
+  border-radius: 18px;
+  padding: 1rem;
+  background: #fbfcff;
+}
+
+.detail-section {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.detail-section h3 {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.detail-section p {
+  margin: 0;
+  color: #31425f;
+  line-height: 1.5;
+}
+
+.json-box {
   max-height: 290px;
   overflow-x: auto;
   overflow-y: auto;
@@ -128,7 +286,7 @@ pre {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
-  margin: 1rem 0;
+  margin: 0;
 }
 
 .result-summary div {
@@ -153,11 +311,25 @@ pre {
 
 @media (max-width: 1180px) {
   .hero-card,
-  .dashboard-grid {
+  .consultation-grid {
     grid-template-columns: 1fr;
   }
 
   .result-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .session-panel {
+    justify-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-shell {
+    width: min(100%, calc(100% - 1rem));
+  }
+
+  .result-summary {
+    grid-template-columns: 1fr;
   }
 }

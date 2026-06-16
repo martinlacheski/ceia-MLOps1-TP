@@ -1,33 +1,71 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 
-interface AuthenticatedUser {
+export const GUARD_RECOMMENDATION_MODE = {
+  MODEL_ARTIFACT_AND_SMN: "model_artifact_and_smn",
+  MODEL_ARTIFACT_ONLY_FALLBACK: "model_artifact_only_fallback",
+  SMN_ONLY_FALLBACK: "smn_only_fallback",
+  DEGRADED_FALLBACK: "degraded_fallback",
+} as const;
+
+export const RISK_LEVEL = {
+  LOW: "bajo",
+  MEDIUM: "medio",
+  HIGH: "alto",
+} as const;
+
+type GuardRecommendationMode =
+  (typeof GUARD_RECOMMENDATION_MODE)[keyof typeof GUARD_RECOMMENDATION_MODE];
+type RiskLevel = (typeof RISK_LEVEL)[keyof typeof RISK_LEVEL];
+
+export interface AuthenticatedUser {
   username: string;
   full_name: string;
   permissions: string[];
 }
 
-interface TokenResponse {
+export interface TokenResponse {
   access_token: string;
   token_type: string;
   user: AuthenticatedUser;
 }
 
-interface LocalModelSignal {
+interface RainPredictionSignal {
+  source: string;
+  model_name: string;
+  model_stage: string;
   rain_probability: number;
+  threshold: number;
   will_rain: boolean;
 }
 
-interface SmnSignal {
+interface ForecastSignal {
+  source: string;
   reference_station: string;
-  daily_precipitation_mm: number;
+  precipitation_mm: number;
   will_rain: boolean;
+}
+
+interface OperationalDecision {
+  recommended_guard: string;
+  risk_level: RiskLevel;
+  reason: string;
+}
+
+interface RecommendationMetadata {
+  generated_at: string;
+  mode: GuardRecommendationMode;
+  training_summary_path: string;
+  serving_artifact_path: string;
+  smn_data_path: string;
+  degradation_reasons: string[];
 }
 
 export interface GuardRecommendationResponse {
-  predicted_date: string;
-  local_model: LocalModelSignal;
-  smn: SmnSignal;
-  recommended_guard: string;
+  target_date: string;
+  prediction: RainPredictionSignal;
+  forecast: ForecastSignal;
+  decision: OperationalDecision;
+  metadata: RecommendationMetadata;
 }
 
 export async function login(username: string, password: string): Promise<TokenResponse> {
