@@ -44,6 +44,8 @@ services:
     build:
       context: ./backend
     container_name: ml-rainops-api
+    environment:
+      PYTHONPATH: /app:/app/src
     env_file:
       - path: .env
         required: false
@@ -51,6 +53,11 @@ services:
       - "${API_PORT:-8000}:8000"
     volumes:
       - ./backend/app:/app/app
+      - ./src:/app/src
+      - ./data:/app/data
+    depends_on:
+      smn-bootstrap:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -71,7 +78,9 @@ services:
       - api
 
   postgres:
-    image: postgres:16-alpine
+    build:
+      context: ./docker/postgres
+    image: ml-rainops-postgres:latest
     container_name: ml-rainops-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-rainops}
@@ -82,7 +91,6 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./docker/postgres/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 10s
@@ -136,6 +144,28 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
       MLFLOW_BUCKET_NAME: ${MLFLOW_BUCKET_NAME:-mlflow}
       DATA_REPO_BUCKET_NAME: ${DATA_REPO_BUCKET_NAME:-data}
+
+  smn-bootstrap:
+    build:
+      context: ./docker/airflow
+    image: ml-rainops-airflow:latest
+    container_name: ml-rainops-smn-bootstrap
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./src:/opt/ml-rainops/src
+      - ./data:/opt/ml-rainops/data
+    user: "${AIRFLOW_UID:-50000}:0"
+    command: >
+      bash -lc '
+      cd /opt/ml-rainops &&
+      mkdir -p data/processed &&
+      PYTHONPATH=src python -m ceml_rain.smn --output data/processed/smn_pron5d_daily.jsonl || {
+        echo "WARNING: SMN bootstrap failed; using existing data/processed/smn_pron5d_daily.jsonl if available";
+        test -s data/processed/smn_pron5d_daily.jsonl;
+      }
+      '
 
   mlflow:
     build:
@@ -252,6 +282,9 @@ services:
       - |
         mkdir -p /opt/airflow/{logs,dags,plugins,config}
         chown -R "${AIRFLOW_UID:-50000}:0" /opt/airflow/{logs,dags,plugins,config}
+        mkdir -p /opt/ml-rainops/data/processed /opt/ml-rainops/data/reports /opt/ml-rainops/data/models/rain_t1/current
+        chown -R "${AIRFLOW_UID:-50000}:0" /opt/ml-rainops/data/processed /opt/ml-rainops/data/reports /opt/ml-rainops/data/models
+        chmod -R g+rwX /opt/ml-rainops/data/processed /opt/ml-rainops/data/reports /opt/ml-rainops/data/models
         airflow version
         airflow db migrate
         airflow users create \
